@@ -186,3 +186,4 @@ logs/
 Data/*
 /onnx
 /.vs
+.idea/
