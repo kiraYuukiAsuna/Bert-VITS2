@@ -83,7 +83,7 @@ class ConvReluNorm(nn.Module):
 
 class DDSConv(nn.Module):
     """
-    Dialted and Depth-Separable Convolution
+    Dilated and Depth-Separable Convolution
     """
 
     def __init__(self, channels, kernel_size, n_layers, p_dropout=0.0):
@@ -577,21 +577,4 @@ class TransformerCouplingLayer(nn.Module):
         else:
             x1 = (x1 - m) * torch.exp(-logs) * x_mask
             x = torch.cat([x0, x1], 1)
-            return x
-
-        x1, logabsdet = piecewise_rational_quadratic_transform(
-            x1,
-            unnormalized_widths,
-            unnormalized_heights,
-            unnormalized_derivatives,
-            inverse=reverse,
-            tails="linear",
-            tail_bound=self.tail_bound,
-        )
-
-        x = torch.cat([x0, x1], 1) * x_mask
-        logdet = torch.sum(logabsdet * x_mask, [1, 2])
-        if not reverse:
-            return x, logdet
-        else:
             return x
