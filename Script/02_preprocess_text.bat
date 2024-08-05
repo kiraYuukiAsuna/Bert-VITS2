@@ -1,0 +1,1 @@
+.\.venv\Scripts\python.exe preprocess_text.py --transcription-path dataset/Elysia/filelists/Label.list --train-path dataset/Elysia/filelists/train.list --val-path dataset/Elysia/filelists/val.list --config-path dataset/Elysia/config.json

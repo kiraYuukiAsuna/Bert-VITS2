@@ -1,1 +1,0 @@
-python bert_gen.py --config dataset/Elysia/config.json
