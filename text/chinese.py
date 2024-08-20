@@ -5,6 +5,7 @@ from pypinyin import Style
 from g2pW.pypinyin_G2pW_bv2 import G2PWPinyin
 from text.symbols import punctuation
 from text.tone_sandhi import ToneSandhi
+import text.english_letter_to_chinese as english_letter_to_chinese
 
 try:
     from tn.chinese.normalizer import Normalizer
@@ -73,7 +74,7 @@ pinyinPlus = G2PWPinyin(
 
 
 def replace_punctuation(text):
-    text = text.replace("嗯", "恩").replace("呣", "母")
+    text = text.replace("嗯", "恩").replace("呣", "母").replace("哈哈", "哇哦")
     pattern = re.compile("|".join(re.escape(p) for p in rep_map.keys()))
 
     replaced_text = pattern.sub(lambda x: rep_map[x.group()], text)
@@ -214,9 +215,19 @@ def _g2p(segments):
     return phones_list, tones_list, word2ph
 
 
+def text_normalize_enhance(text):
+    import text.chn_text_norm.text as chn_text_norm
+    return chn_text_norm.Text(text).normalize()
+
 def text_normalize(text):
+    text = english_letter_to_chinese.convert_to_pinyin(text)
+
+    text = text_normalize_enhance(text)
+
     text = normalizer(text)
+
     text = replace_punctuation(text)
+
     return text
 
 

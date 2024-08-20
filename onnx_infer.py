@@ -1,4 +1,4 @@
-﻿from onnx_modules.V220_OnnxInference import OnnxInferenceSession
+﻿from onnx_modules.V240_OnnxInference import OnnxInferenceSession
 import numpy as np
 
 Session = OnnxInferenceSession(
@@ -10,10 +10,9 @@ Session = OnnxInferenceSession(
         "flow": "onnx/BertVits2.2PT/BertVits2.2PT_flow.onnx",
         "dec": "onnx/BertVits2.2PT/BertVits2.2PT_dec.onnx",
     },
-    Providers=["CPUExecutionProvider"],
+    Providers=["DmlExecutionProvider"],
 )
 
-# 这里的输入和原版是一样的，只需要在原版预处理结果出来之后加上.numpy()即可
 x = np.array(
     [
         0,
@@ -50,11 +49,48 @@ x = np.array(
 tone = np.zeros_like(x)
 language = np.zeros_like(x)
 sid = np.array([0])
-bert = np.random.randn(x.shape[0], 1024)
-ja_bert = np.random.randn(x.shape[0], 1024)
-en_bert = np.random.randn(x.shape[0], 1024)
+bert = np.random.randn(x.shape[0], 2048)
+ja_bert = np.random.randn(x.shape[0], 2048)
+en_bert = np.random.randn(x.shape[0], 2048)
 emo = np.random.randn(512, 1)
 
-audio = Session(x, tone, language, bert, ja_bert, en_bert, emo, sid)
+while True:
+    audio = Session(x, tone, language, bert, emo, sid)
 
 print(audio)
+
+
+# 这里的输入和原版是一样的，只需要在原版预处理结果出来之后加上.numpy()即可
+# x = np.array(
+#     [
+#         0,
+#         97,
+#         0,
+#         8,
+#         0,
+#         78,
+#         0,
+#         8,
+#         0,
+#         76,
+#         0,
+#         37,
+#         0,
+#         40,
+#         0,
+#         97,
+#         0,
+#         8,
+#         0,
+#         23,
+#         0,
+#         8,
+#         0,
+#         74,
+#         0,
+#         26,
+#         0,
+#         104,
+#         0,
+#     ]
+# )

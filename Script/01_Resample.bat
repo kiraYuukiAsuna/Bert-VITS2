@@ -1,0 +1,1 @@
+.\.venv\Scripts\python.exe resample_legacy.py --sr 44100 --in_dir dataset/Elysia/AudioRaw --out_dir dataset/Elysia/wavs

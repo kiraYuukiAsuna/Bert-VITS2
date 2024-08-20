@@ -3,8 +3,8 @@ import os
 
 if __name__ == "__main__":
     export_path = "BertVits2.2PT"
-    model_path = "model\\G_0.pth"
-    config_path = "model\\config.json"
+    model_path = "dataset/Elysia/models/G_78000.pth"
+    config_path = "dataset/Elysia/config.json"
     novq = False
     dev = False
     if not os.path.exists("onnx"):

@@ -1,6 +1,6 @@
 librosa==0.9.2
 matplotlib
-numpy
+numpy==1.26.4
 numba
 phonemizer
 scipy
@@ -12,7 +12,7 @@ jieba
 transformers
 pypinyin
 cn2an
-gradio==3.50.2
+gradio==4.36.1
 av
 mecab-python3
 loguru
@@ -32,5 +32,5 @@ sentencepiece
 pykakasi
 langid
 onnxruntime-gpu
-opencc==1.1.6
-WeTextProcessing>=0.1.10; platform_system != "Windows"
+opencc==1.1.7
+WeTextProcessing>=1.0.2; platform_system != "Windows"
