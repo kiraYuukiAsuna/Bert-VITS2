@@ -1,6 +1,6 @@
 import torch
 import torch.utils.data
-from librosa.filters import mel as librosa_mel_fn
+import torchaudio
 import warnings
 
 # warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -83,10 +83,22 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
     dtype_device = str(spec.dtype) + "_" + str(spec.device)
     fmax_dtype_device = str(fmax) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
-        mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
-            dtype=spec.dtype, device=spec.device
+        # 创建 MelScale 对象
+        mel_scaler = torchaudio.transforms.MelScale(
+            n_mels=num_mels,
+            sample_rate=sampling_rate,
+            f_min=fmin,
+            f_max=fmax,
+            n_stft=n_fft // 2 + 1,
+            norm=None,
+            mel_scale="htk"
         )
+        # 提取滤波器矩阵并转置
+        mel = mel_scaler.fb.transpose(0, 1)  # shape: (num_mels, n_fft//2 + 1)
+        # 获取滤波器组并存入缓存
+        mel_basis[fmax_dtype_device] = mel.to(
+            dtype=spec.dtype, device=spec.device)
+
     spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
     spec = spectral_normalize_torch(spec)
     return spec
@@ -105,10 +117,21 @@ def mel_spectrogram_torch(
     fmax_dtype_device = str(fmax) + "_" + dtype_device
     wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
-        mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
-            dtype=y.dtype, device=y.device
+        # 创建 MelScale 对象
+        mel_scaler = torchaudio.transforms.MelScale(
+            n_mels=num_mels,
+            sample_rate=sampling_rate,
+            f_min=fmin,
+            f_max=fmax,
+            n_stft=n_fft // 2 + 1,
+            norm=None,
+            mel_scale="htk"
         )
+        # 提取滤波器矩阵并转置
+        mel = mel_scaler.fb.transpose(0, 1)  # shape: (num_mels, n_fft//2 + 1)
+        # 获取滤波器组并存入缓存
+        mel_basis[fmax_dtype_device] = mel.to(
+            dtype=y.dtype, device=y.device)
     if wnsize_dtype_device not in hann_window:
         hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(
             dtype=y.dtype, device=y.device

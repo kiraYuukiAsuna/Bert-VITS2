@@ -1,6 +1,6 @@
-librosa==0.9.2
+# cuda12.6+cuDNN9.6+python3.13.2+torch2.6.0
 matplotlib
-numpy==1.26.4
+numpy
 numba
 phonemizer
 scipy
@@ -12,7 +12,7 @@ jieba
 transformers
 pypinyin
 cn2an
-gradio==4.36.1
+gradio
 av
 mecab-python3
 loguru
@@ -22,7 +22,7 @@ fugashi
 num2words
 PyYAML
 requests
-pyopenjtalk-prebuilt
+pyopenjtalk
 jaconv
 psutil
 GPUtil
@@ -32,5 +32,5 @@ sentencepiece
 pykakasi
 langid
 onnxruntime-gpu
-opencc==1.1.7
+opencc
 WeTextProcessing>=1.0.2; platform_system != "Windows"

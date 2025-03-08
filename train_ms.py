@@ -1,4 +1,26 @@
 # flake8: noqa: E402
+from text.symbols import symbols
+from mel_processing import mel_spectrogram_torch, spec_to_mel_torch
+from losses import (
+    generator_loss,
+    discriminator_loss,
+    feature_loss,
+    kl_loss,
+    WavLMLoss,
+)
+from models import (
+    SynthesizerTrn,
+    MultiPeriodDiscriminator,
+    DurationDiscriminator,
+    WavLMDiscriminator,
+)
+from data_utils import (
+    TextAudioSpeakerLoader,
+    TextAudioSpeakerCollate,
+    DistributedBucketSampler,
+)
+import utils
+import commons
 import platform
 import os
 import torch
@@ -15,28 +37,6 @@ import argparse
 import datetime
 
 logging.getLogger("numba").setLevel(logging.WARNING)
-import commons
-import utils
-from data_utils import (
-    TextAudioSpeakerLoader,
-    TextAudioSpeakerCollate,
-    DistributedBucketSampler,
-)
-from models import (
-    SynthesizerTrn,
-    MultiPeriodDiscriminator,
-    DurationDiscriminator,
-    WavLMDiscriminator,
-)
-from losses import (
-    generator_loss,
-    discriminator_loss,
-    feature_loss,
-    kl_loss,
-    WavLMLoss,
-)
-from mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from text.symbols import symbols
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = (
@@ -50,6 +50,7 @@ torch.backends.cuda.enable_mem_efficient_sdp(
     True
 )  # Not available if torch version is lower than 2.0
 global_step = 0
+
 
 def run():
     # 环境变量解析
@@ -73,7 +74,7 @@ def run():
         backend = "gloo"  # If Windows,switch to gloo backend.
     dist.init_process_group(
         backend=backend,
-        init_method="env://",
+        init_method="env://?use_libuv=False",
         timeout=datetime.timedelta(seconds=300),
     )  # Use torchrun instead of mp.spawn
     rank = dist.get_rank()
@@ -123,7 +124,8 @@ def run():
         logger.info(hps)
         utils.check_git_hash(hps.model_dir)
         writer = SummaryWriter(log_dir=hps.model_dir)
-        writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
+        writer_eval = SummaryWriter(
+            log_dir=os.path.join(hps.model_dir, "eval"))
     train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps.data)
     train_sampler = DistributedBucketSampler(
         train_dataset,
@@ -136,7 +138,8 @@ def run():
     collate_fn = TextAudioSpeakerCollate()
     train_loader = DataLoader(
         train_dataset,
-        num_workers=min(config.train_ms_config.num_workers, os.cpu_count() - 1),
+        num_workers=min(config.train_ms_config.num_workers,
+                        os.cpu_count() - 1),
         shuffle=False,
         pin_memory=True,
         collate_fn=collate_fn,
@@ -145,7 +148,8 @@ def run():
         prefetch_factor=6,
     )  # DataLoader config could be adjusted.
     if rank == 0:
-        eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps.data)
+        eval_dataset = TextAudioSpeakerLoader(
+            hps.data.validation_files, hps.data)
         eval_loader = DataLoader(
             eval_dataset,
             num_workers=0,
@@ -219,7 +223,8 @@ def run():
         for param in net_g.enc_p.emo_vq.parameters():
             param.requires_grad = False
 
-    net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(local_rank)
+    net_d = MultiPeriodDiscriminator(
+        hps.model.use_spectral_norm).cuda(local_rank)
     optim_g = torch.optim.AdamW(
         filter(lambda p: p.requires_grad, net_g.parameters()),
         hps.train.learning_rate,
@@ -329,7 +334,8 @@ def run():
         epoch_str = max(epoch_str, 1)
         # global_step = (epoch_str - 1) * len(train_loader)
         global_step = int(
-            utils.get_steps(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"))
+            utils.get_steps(utils.latest_checkpoint_path(
+                hps.model_dir, "G_*.pth"))
         )
         print(
             f"******************检测到模型存在，epoch为 {epoch_str}，gloabl step为 {global_step}*********************"
@@ -450,7 +456,8 @@ def train_and_evaluate(
                 net_g.module.mas_noise_scale_initial
                 - net_g.module.noise_scale_delta * global_step
             )
-            net_g.module.current_mas_noise_scale = max(current_mas_noise_scale, 0.0)
+            net_g.module.current_mas_noise_scale = max(
+                current_mas_noise_scale, 0.0)
         x, x_lengths = x.cuda(local_rank, non_blocking=True), x_lengths.cuda(
             local_rank, non_blocking=True
         )
@@ -558,14 +565,16 @@ def train_and_evaluate(
                 scaler.scale(loss_slm).backward()
                 scaler.unscale_(optim_wd)
                 # torch.nn.utils.clip_grad_norm_(parameters=net_wd.parameters(), max_norm=200)
-                grad_norm_wd = commons.clip_grad_value_(net_wd.parameters(), None)
+                grad_norm_wd = commons.clip_grad_value_(
+                    net_wd.parameters(), None)
                 scaler.step(optim_wd)
 
         optim_d.zero_grad()
         scaler.scale(loss_disc_all).backward()
         scaler.unscale_(optim_d)
         if getattr(hps.train, "bf16_run", False):
-            torch.nn.utils.clip_grad_norm_(parameters=net_d.parameters(), max_norm=200)
+            torch.nn.utils.clip_grad_norm_(
+                parameters=net_d.parameters(), max_norm=200)
         grad_norm_d = commons.clip_grad_value_(net_d.parameters(), None)
         scaler.step(optim_d)
 
@@ -580,7 +589,8 @@ def train_and_evaluate(
             with autocast(enabled=hps.train.bf16_run, dtype=torch.bfloat16):
                 loss_dur = torch.sum(l_length.float())
                 loss_mel = F.l1_loss(y_mel, y_hat_mel) * hps.train.c_mel
-                loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
+                loss_kl = kl_loss(z_p, logs_q, m_p, logs_p,
+                                  z_mask) * hps.train.c_kl
 
                 loss_fm = feature_loss(fmap_r, fmap_g)
                 loss_gen, losses_gen = generator_loss(y_d_hat_g)
@@ -607,7 +617,8 @@ def train_and_evaluate(
         scaler.scale(loss_gen_all).backward()
         scaler.unscale_(optim_g)
         # if getattr(hps.train, "bf16_run", False):
-        torch.nn.utils.clip_grad_norm_(parameters=net_g.parameters(), max_norm=200)
+        torch.nn.utils.clip_grad_norm_(
+            parameters=net_g.parameters(), max_norm=200)
         grad_norm_g = commons.clip_grad_value_(net_g.parameters(), None)
         scaler.step(optim_g)
         scaler.update()
@@ -615,7 +626,8 @@ def train_and_evaluate(
         if rank == 0:
             if global_step % hps.train.log_interval == 0:
                 lr = optim_g.param_groups[0]["lr"]
-                losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
+                losses = [loss_disc, loss_gen, loss_fm,
+                          loss_mel, loss_dur, loss_kl]
                 logger.info(
                     "Train Epoch: {} [{:.0f}%]".format(
                         epoch, 100.0 * batch_idx / len(train_loader)
@@ -640,17 +652,21 @@ def train_and_evaluate(
                     }
                 )
                 scalar_dict.update(
-                    {"loss/g/{}".format(i): v for i, v in enumerate(losses_gen)}
+                    {"loss/g/{}".format(i): v for i,
+                     v in enumerate(losses_gen)}
                 )
                 scalar_dict.update(
-                    {"loss/d_r/{}".format(i): v for i, v in enumerate(losses_disc_r)}
+                    {"loss/d_r/{}".format(i): v for i,
+                     v in enumerate(losses_disc_r)}
                 )
                 scalar_dict.update(
-                    {"loss/d_g/{}".format(i): v for i, v in enumerate(losses_disc_g)}
+                    {"loss/d_g/{}".format(i): v for i,
+                     v in enumerate(losses_disc_g)}
                 )
 
                 if net_dur_disc is not None:
-                    scalar_dict.update({"loss/dur_disc/total": loss_dur_disc_all})
+                    scalar_dict.update(
+                        {"loss/dur_disc/total": loss_dur_disc_all})
 
                     scalar_dict.update(
                         {
@@ -710,14 +726,16 @@ def train_and_evaluate(
                     optim_g,
                     hps.train.learning_rate,
                     epoch,
-                    os.path.join(hps.model_dir, "G_{}.pth".format(global_step)),
+                    os.path.join(
+                        hps.model_dir, "G_{}.pth".format(global_step)),
                 )
                 utils.save_checkpoint(
                     net_d,
                     optim_d,
                     hps.train.learning_rate,
                     epoch,
-                    os.path.join(hps.model_dir, "D_{}.pth".format(global_step)),
+                    os.path.join(
+                        hps.model_dir, "D_{}.pth".format(global_step)),
                 )
                 if net_dur_disc is not None:
                     utils.save_checkpoint(
@@ -725,7 +743,8 @@ def train_and_evaluate(
                         optim_dur_disc,
                         hps.train.learning_rate,
                         epoch,
-                        os.path.join(hps.model_dir, "DUR_{}.pth".format(global_step)),
+                        os.path.join(
+                            hps.model_dir, "DUR_{}.pth".format(global_step)),
                     )
                 if net_wd is not None:
                     utils.save_checkpoint(
@@ -733,7 +752,8 @@ def train_and_evaluate(
                         optim_wd,
                         hps.train.learning_rate,
                         epoch,
-                        os.path.join(hps.model_dir, "WD_{}.pth".format(global_step)),
+                        os.path.join(
+                            hps.model_dir, "WD_{}.pth".format(global_step)),
                     )
                 keep_ckpts = config.train_ms_config.keep_ckpts
                 permanent_ckpt_start = config.train_ms_config.permanent_ckpt_start
@@ -765,7 +785,7 @@ def evaluate(hps, generator, eval_loader, writer_eval):
     audio_dict = {}
     scores = []
     predictor = torch.hub.load(
-    "tarepan/SpeechMOS:v1.2.0", "utmos22_strong", trust_repo=True).cuda()
+        "tarepan/SpeechMOS:v1.2.0", "utmos22_strong", trust_repo=True).cuda()
     print("Evaluating ...")
     with torch.no_grad():
         for batch_idx, (
@@ -846,7 +866,8 @@ def evaluate(hps, generator, eval_loader, writer_eval):
                         )
                     }
                 )
-                audio_dict.update({f"gt/audio_{batch_idx}": y[0, :, : y_lengths[0]]})
+                audio_dict.update(
+                    {f"gt/audio_{batch_idx}": y[0, :, : y_lengths[0]]})
     average_score = sum(scores) / len(scores)
     scalar_dict = {"val/mos": average_score}
     # scalar_dict.update({"val/mos": average_score})

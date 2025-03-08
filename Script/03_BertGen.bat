@@ -1,1 +1,1 @@
-.\.venv\Scripts\python.exe bert_gen.py --config dataset/Elysia/config.json
+.\venv\Scripts\python.exe bert_gen.py --config dataset/Elysia/config.json

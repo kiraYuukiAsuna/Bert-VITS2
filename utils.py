@@ -187,9 +187,12 @@ def plot_spectrogram_to_numpy(spectrogram):
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    data = np.fromstring(fig.canvas.tostring_argb(), dtype=np.uint8, sep="")
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))  # 注意这里是4，不是3
+    # 转换 ARGB 到 RGB: 删除 Alpha 通道，并重新排列通道顺序
+    data = data[:, :, 1:]  # 移除 Alpha 通道，保留 RGB
     plt.close()
+
     return data
 
 
@@ -218,9 +221,13 @@ def plot_alignment_to_numpy(alignment, info=None):
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    data = np.fromstring(fig.canvas.tostring_argb(), dtype=np.uint8, sep="")
+    data = data.reshape(fig.canvas.get_width_height()
+                        [::-1] + (4,))  # 注意这里是4，不是3
+    # 转换 ARGB 到 RGB: 删除 Alpha 通道，并重新排列通道顺序
+    data = data[:, :, 1:]  # 移除 Alpha 通道，保留 RGB
     plt.close()
+
     return data
 
 

@@ -1,9 +1,9 @@
 import os
-import argparse
-import librosa
+import argparse 
 from multiprocessing import Pool, cpu_count
 
 import soundfile
+import torchaudio
 from tqdm import tqdm
 
 from config import config
@@ -13,7 +13,15 @@ def process(item):
     spkdir, wav_name, args = item
     wav_path = os.path.join(args.in_dir, spkdir, wav_name)
     if os.path.exists(wav_path) and wav_path.lower().endswith(".wav"):
-        wav, sr = librosa.load(wav_path, sr=args.sr)
+        waveform, sample_rate = torchaudio.load(wav_path)
+
+        if sample_rate != args.sr:
+            wav = torchaudio.functional.resample(waveform, sample_rate, args.sr)
+            sr = args.sr
+        else:
+            wav = waveform
+            sr = sample_rate
+        wav = wav.squeeze(0)  # 如果需要单声道数据
         soundfile.write(os.path.join(args.out_dir, spkdir, wav_name), wav, sr)
 
 
