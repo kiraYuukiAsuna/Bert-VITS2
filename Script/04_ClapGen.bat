@@ -1,0 +1,1 @@
+.\venv\Scripts\python.exe clap_gen.py --config dataset/xiaogong/config.json

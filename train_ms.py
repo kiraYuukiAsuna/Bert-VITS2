@@ -74,7 +74,7 @@ def run():
         backend = "gloo"  # If Windows,switch to gloo backend.
     dist.init_process_group(
         backend=backend,
-        init_method="env://",
+        init_method="env://?use_libuv=False",
         timeout=datetime.timedelta(seconds=300),
     )  # Use torchrun instead of mp.spawn
     rank = dist.get_rank()

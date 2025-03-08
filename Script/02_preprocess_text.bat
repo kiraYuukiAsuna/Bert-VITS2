@@ -1,0 +1,1 @@
+.\venv\Scripts\python.exe preprocess_text.py --transcription-path dataset/xiaogong/filelists/Label.list --train-path dataset/xiaogong/filelists/train.list --val-path dataset/xiaogong/filelists/val.list --config-path dataset/xiaogong/config.json

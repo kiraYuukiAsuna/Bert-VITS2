@@ -5,9 +5,9 @@ import logging
 import gc
 import random
 
-import librosa
 import gradio
 import numpy as np
+import torchaudio
 import utils
 from fastapi import FastAPI, Query, Request, File, UploadFile, Form
 from fastapi.responses import Response, FileResponse
@@ -244,7 +244,15 @@ if __name__ == "__main__":
             ref_audio = BytesIO(await reference_audio.read())
             # 2.2 适配
             if loaded_models.models[model_id].version == "2.2":
-                ref_audio, _ = librosa.load(ref_audio, 48000)
+                waveform, sample_rate = torchaudio.load(ref_audio)
+                if sample_rate != 48000:
+                    wav = torchaudio.functional.resample(
+                        waveform, sample_rate, 48000)
+                    sr = 48000
+                else:
+                    wav = waveform
+                    sr = sample_rate
+                ref_audio = wav.squeeze(0)  # 如果需要单声道数据
 
         else:
             ref_audio = reference_audio

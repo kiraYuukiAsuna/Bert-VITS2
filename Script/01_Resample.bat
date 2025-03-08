@@ -1,0 +1,1 @@
+.\venv\Scripts\python.exe resample.py --sr 44100 --in_dir dataset/xiaogong/AudioRaw --out_dir dataset/xiaogong/wavs
