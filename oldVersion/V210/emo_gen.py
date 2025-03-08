@@ -1,8 +1,8 @@
-import librosa
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+import torchaudio
 from transformers import Wav2Vec2Processor
 from transformers.models.wav2vec2.modeling_wav2vec2 import (
     Wav2Vec2Model,
@@ -67,7 +67,16 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, idx):
         wav_file = self.list_of_wav_files[idx]
-        audio_data, _ = librosa.load(wav_file, sr=self.sr)
+        waveform, sample_rate = torchaudio.load(wav_file)
+
+        if sample_rate != self.sr:
+            wav = torchaudio.functional.resample(
+                waveform, sample_rate, self.sr)
+            sr = self.sr
+        else:
+            wav = waveform
+            sr = sample_rate
+        audio_data = wav.squeeze(0)  # 如果需要单声道数据
         processed_data = self.processor(audio_data, sampling_rate=self.sr)[
             "input_values"
         ][0]
@@ -105,7 +114,15 @@ def process_func(
 
 
 def get_emo(path):
-    wav, sr = librosa.load(path, 16000)
+    waveform, sample_rate = torchaudio.load(path)
+
+    if sample_rate != 16000:
+        wav = torchaudio.functional.resample(waveform, sample_rate, 16000)
+        sr = 16000
+    else:
+        wav = waveform
+        sr = sample_rate
+    wav = wav.squeeze(0)  # 如果需要单声道数据
     return process_func(
         np.expand_dims(wav, 0).astype(np.float64),
         sr,

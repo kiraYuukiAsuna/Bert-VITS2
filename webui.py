@@ -1,6 +1,8 @@
 # flake8: noqa: E402
 import gc
 import os
+
+import torchaudio
 import logging
 import re_matching
 from tools.sentence import split_by_language
@@ -24,7 +26,6 @@ import webbrowser
 import numpy as np
 from config import config
 from tools.translate import translate
-import librosa
 
 net_g = None
 
@@ -369,8 +370,15 @@ def format_utils(text, speaker):
 
 
 def load_audio(path):
-    audio, sr = librosa.load(path, 48000)
-    # audio = librosa.resample(audio, 44100, 48000)
+    waveform, sample_rate = torchaudio.load(path)
+
+    if sample_rate != 48000:
+        wav = torchaudio.functional.resample(waveform, sample_rate, 48000)
+        sr = 48000
+    else:
+        wav = waveform
+        sr = sample_rate
+    audio = wav.squeeze(0)  # 如果需要单声道数据
     return sr, audio
 
 

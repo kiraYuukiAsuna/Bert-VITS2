@@ -8,7 +8,7 @@ from tqdm import tqdm
 import utils
 from config import config
 from .clap_wrapper import get_clap_audio_feature
-import librosa
+import torchaudio
 import os
 
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -31,8 +31,13 @@ def process_line(line):
     if os.path.isfile(clap_path):
         return
 
-    audio = librosa.load(wav_path, 48000)[0]
-    # audio = librosa.resample(audio, 44100, 48000)
+    waveform, sample_rate = torchaudio.load(wav_path)
+
+    if sample_rate != 48000:
+        audio = torchaudio.functional.resample(waveform, sample_rate, 48000)
+    else:
+        audio = waveform
+    audio = audio.squeeze(0)  # 如果需要单声道数据
 
     clap = get_clap_audio_feature(audio, device)
     torch.save(clap, clap_path)
