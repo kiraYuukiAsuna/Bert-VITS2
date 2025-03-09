@@ -32,3 +32,4 @@ sentencepiece
 pykakasi
 langid
 onnxruntime-gpu
+standard-imghdr
