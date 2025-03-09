@@ -34,3 +34,4 @@ langid
 onnxruntime-gpu
 opencc
 WeTextProcessing>=1.0.2; platform_system != "Windows"
+standard-imghdr
