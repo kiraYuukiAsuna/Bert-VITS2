@@ -186,6 +186,7 @@ def plot_spectrogram_to_numpy(spectrogram):
     plt.ylabel("Channels")
     plt.tight_layout()
 
+    fig.canvas.draw()
     data = np.fromstring(fig.canvas.tostring_argb(), dtype=np.uint8, sep="")
     data = data.reshape(fig.canvas.get_width_height()
                         [::-1] + (4,))  # 注意这里是4，不是3
@@ -220,6 +221,7 @@ def plot_alignment_to_numpy(alignment, info=None):
     plt.ylabel("Encoder timestep")
     plt.tight_layout()
 
+    fig.canvas.draw()
     data = np.fromstring(fig.canvas.tostring_argb(), dtype=np.uint8, sep="")
     data = data.reshape(fig.canvas.get_width_height()
                         [::-1] + (4,))  # 注意这里是4，不是3
