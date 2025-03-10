@@ -957,6 +957,7 @@ class SynthesizerTrn(nn.Module):
                 input_names=["sid"],
                 output_names=["g"],
                 verbose=True,
+                opset_version=17
             )
         else:
             g = self.ref_enc(y.transpose(1, 2)).unsqueeze(-1)
@@ -989,7 +990,7 @@ class SynthesizerTrn(nn.Module):
                 "x_mask": [0, 2],
             },
             verbose=True,
-            opset_version=16,
+            opset_version=17
         )
 
         x, m_p, logs_p, x_mask = self.enc_p(
@@ -1008,6 +1009,7 @@ class SynthesizerTrn(nn.Module):
             output_names=["logw"],
             dynamic_axes={"x": [0, 2], "x_mask": [0, 2], "zin": [0, 2], "logw": [0, 2]},
             verbose=True,
+            opset_version=17
         )
         torch.onnx.export(
             self.dp,
@@ -1017,6 +1019,7 @@ class SynthesizerTrn(nn.Module):
             output_names=["logw"],
             dynamic_axes={"x": [0, 2], "x_mask": [0, 2], "logw": [0, 2]},
             verbose=True,
+            opset_version=17
         )
         logw = self.sdp(x, x_mask, zinput, g=g) * (sdp_ratio) + self.dp(
             x, x_mask, g=g
@@ -1046,6 +1049,7 @@ class SynthesizerTrn(nn.Module):
             output_names=["z"],
             dynamic_axes={"z_p": [0, 2], "y_mask": [0, 2], "z": [0, 2]},
             verbose=True,
+            opset_version=17
         )
 
         z = self.flow(z_p, y_mask, g=g, reverse=True)
@@ -1059,5 +1063,6 @@ class SynthesizerTrn(nn.Module):
             output_names=["o"],
             dynamic_axes={"z_in": [0, 2], "o": [0, 2]},
             verbose=True,
+            opset_version=17
         )
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
