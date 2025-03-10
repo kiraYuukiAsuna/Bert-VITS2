@@ -14,6 +14,8 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from commons import init_weights, get_padding
 from .text import symbols, num_tones, num_languages
 
+from vector_quantize_pytorch import VectorQuantize
+
 
 class DurationDiscriminator(nn.Module):  # vits2
     def __init__(
@@ -316,8 +318,34 @@ class TextEncoder(nn.Module):
         self.language_emb = nn.Embedding(num_languages, hidden_channels)
         nn.init.normal_(self.language_emb.weight, 0.0, hidden_channels**-0.5)
         self.bert_proj = nn.Conv1d(1024, hidden_channels, 1)
-        self.ja_bert_proj = nn.Conv1d(1024, hidden_channels, 1)
-        self.en_bert_proj = nn.Conv1d(1024, hidden_channels, 1)
+        # self.bert_pre_proj = nn.Conv1d(2048, 1024, 1)
+        self.in_feature_net = nn.Sequential(
+            # input is assumed to an already normalized embedding
+            nn.Linear(512, 1028, bias=False),
+            nn.GELU(),
+            nn.LayerNorm(1028),
+            *[Block(1028, 512) for _ in range(1)],
+            nn.Linear(1028, 512, bias=False),
+            # normalize before passing to VQ?
+            # nn.GELU(),
+            # nn.LayerNorm(512),
+        )
+        self.emo_vq = VectorQuantize(
+            dim=512,
+            # codebook_size=128,
+            codebook_size=256,
+            codebook_dim=16,
+            # codebook_dim=32,
+            commitment_weight=0.1,
+            decay=0.99,
+            heads=32,
+            kmeans_iters=20,
+            separate_codebook_per_head=True,
+            stochastic_sample_codes=True,
+            threshold_ema_dead_code=2,
+            use_cosine_sim=True,
+        )
+        self.out_feature_net = nn.Linear(512, hidden_channels)
 
         self.encoder = attentions_onnx.Encoder(
             hidden_channels,
@@ -330,22 +358,19 @@ class TextEncoder(nn.Module):
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths, tone, language, bert, ja_bert, en_bert, g=None):
+    def forward(self, x, x_lengths, tone, language, bert, emo, g=None):
         x_mask = torch.ones_like(x).unsqueeze(0)
         bert_emb = self.bert_proj(bert.transpose(0, 1).unsqueeze(0)).transpose(1, 2)
-        ja_bert_emb = self.ja_bert_proj(ja_bert.transpose(0, 1).unsqueeze(0)).transpose(
-            1, 2
-        )
-        en_bert_emb = self.en_bert_proj(en_bert.transpose(0, 1).unsqueeze(0)).transpose(
-            1, 2
-        )
+        emo_emb = self.in_feature_net(emo.transpose(0, 1))
+        # emo_emb, _, _ = self.emo_vq(emo_emb.unsqueeze(1))
+        emo_emb = emo_emb.unsqueeze(1)
+        emo_emb = self.out_feature_net(emo_emb)
         x = (
             self.emb(x)
             + self.tone_emb(tone)
             + self.language_emb(language)
             + bert_emb
-            + ja_bert_emb
-            + en_bert_emb
+            + emo_emb
         ) * math.sqrt(
             self.hidden_channels
         )  # [b, t, h]
@@ -794,7 +819,7 @@ class SynthesizerTrn(nn.Module):
         gin_channels=256,
         use_sdp=True,
         n_flow_layer=4,
-        n_layers_trans_flow=4,
+        n_layers_trans_flow=6,
         flow_share_parameter=False,
         use_transformer_flow=True,
         **kwargs,
@@ -945,8 +970,7 @@ class SynthesizerTrn(nn.Module):
         x_lengths = torch.LongTensor([x.shape[1]]).cpu()
         sid = torch.LongTensor([0]).cpu()
         bert = torch.randn(size=(x.shape[1], 1024)).cpu()
-        ja_bert = torch.randn(size=(x.shape[1], 1024)).cpu()
-        en_bert = torch.randn(size=(x.shape[1], 1024)).cpu()
+        emo = torch.randn(512, 1)
 
         if self.n_speakers > 0:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
@@ -964,7 +988,7 @@ class SynthesizerTrn(nn.Module):
 
         torch.onnx.export(
             self.enc_p,
-            (x, x_lengths, tone, language, bert, ja_bert, en_bert, g),
+            (x, x_lengths, tone, language, bert, emo, g),
             f"onnx/{path}/{path}_enc_p.onnx",
             input_names=[
                 "x",
@@ -972,8 +996,7 @@ class SynthesizerTrn(nn.Module):
                 "t",
                 "language",
                 "bert_0",
-                "bert_1",
-                "bert_2",
+                "emo",
                 "g",
             ],
             output_names=["xout", "m_p", "logs_p", "x_mask"],
@@ -982,8 +1005,6 @@ class SynthesizerTrn(nn.Module):
                 "t": [0, 1],
                 "language": [0, 1],
                 "bert_0": [0],
-                "bert_1": [0],
-                "bert_2": [0],
                 "xout": [0, 2],
                 "m_p": [0, 2],
                 "logs_p": [0, 2],
@@ -993,9 +1014,7 @@ class SynthesizerTrn(nn.Module):
             opset_version=17
         )
 
-        x, m_p, logs_p, x_mask = self.enc_p(
-            x, x_lengths, tone, language, bert, ja_bert, en_bert, g
-        )
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, tone, language, bert, emo, g)
 
         zinput = (
             torch.randn(x.size(0), 2, x.size(2)).to(device=x.device, dtype=x.dtype)
