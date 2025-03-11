@@ -17,6 +17,110 @@ from .text import symbols, num_tones, num_languages
 from vector_quantize_pytorch import VectorQuantize
 
 
+class ONNXFriendlyVQ(nn.Module):
+    """ONNX友好的Vector Quantization实现"""
+
+    def __init__(
+        self,
+        dim,
+        codebook_size,
+        codebook_dim=None,
+        heads=1,
+        separate_codebook_per_head=False,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.heads = heads
+        self.codebook_size = codebook_size
+        self.codebook_dim = codebook_dim if codebook_dim is not None else dim // heads
+
+        # 初始化codebook
+        codebook_shape = (heads, codebook_size, self.codebook_dim) if separate_codebook_per_head else (
+            1, codebook_size, self.codebook_dim)
+        self.register_buffer('codebook', torch.randn(codebook_shape))
+
+        # 投影层
+        self.project_in = nn.Linear(
+            dim, heads * self.codebook_dim) if dim != heads * self.codebook_dim else nn.Identity()
+        self.project_out = nn.Linear(
+            heads * self.codebook_dim, dim) if dim != heads * self.codebook_dim else nn.Identity()
+
+    def forward(self, x):
+        batch_size, seq_len, dim = x.shape
+
+        # 投影到正确的维度
+        x_proj = self.project_in(x)  # [b, seq_len, heads*codebook_dim]
+
+        # 重新整形为多头格式
+        x_reshaped = x_proj.reshape(
+            batch_size, seq_len, self.heads, self.codebook_dim)
+
+        # 准备存储量化结果
+        quantized = torch.zeros_like(x_reshaped)
+        indices = torch.zeros(batch_size, seq_len, self.heads,
+                              dtype=torch.long, device=x.device)
+
+        # 对每个head分别处理
+        for h in range(self.heads):
+            # 获取当前head的输入
+            x_h = x_reshaped[:, :, h, :]  # [b, seq_len, codebook_dim]
+
+            # 获取对应的codebook
+            # [codebook_size, codebook_dim]
+            codebook_h = self.codebook[0 if self.codebook.shape[0] == 1 else h]
+
+            # 为每个输入向量计算与所有codebook向量的距离
+            # 展开欧氏距离计算: ||x-y||² = ||x||² + ||y||² - 2x·y
+            # [b*seq_len, codebook_dim]
+            x_flat = x_h.reshape(-1, self.codebook_dim)
+            # [b*seq_len, 1]
+            x_norm = torch.sum(x_flat**2, dim=1, keepdim=True)
+            y_norm = torch.sum(codebook_h**2, dim=1)  # [codebook_size]
+
+            # 计算点积
+            # [b*seq_len, codebook_size]
+            xy = torch.matmul(x_flat, codebook_h.t())
+
+            # 计算距离
+            # [b*seq_len, codebook_size]
+            dist = x_norm + y_norm.unsqueeze(0) - 2 * xy
+
+            # 找到最近的codebook项
+            min_indices = torch.argmin(dist, dim=1)  # [b*seq_len]
+            min_indices = min_indices.reshape(
+                batch_size, seq_len)  # [b, seq_len]
+
+            # 存储索引
+            indices[:, :, h] = min_indices
+
+            # 获取对应的codebook向量
+            min_one_hot = torch.zeros(
+                batch_size*seq_len, self.codebook_size, device=x.device)
+            min_one_hot.scatter_(1, min_indices.reshape(-1, 1), 1)
+
+            # 检索codebook向量
+            # [b*seq_len, codebook_dim]
+            quantized_flat = torch.matmul(min_one_hot, codebook_h)
+            quantized_reshaped = quantized_flat.reshape(
+                batch_size, seq_len, self.codebook_dim)
+
+            # 存储结果
+            quantized[:, :, h, :] = quantized_reshaped
+
+        # 重整形量化结果
+        quantized = quantized.reshape(
+            batch_size, seq_len, self.heads * self.codebook_dim)
+
+        # 投影回原始维度
+        quantized = self.project_out(quantized)
+
+        # 创建一个虚拟距离张量，不影响推理结果
+        distances = torch.zeros(
+            batch_size, seq_len, self.heads, self.codebook_size, device=x.device)
+
+        return quantized, indices, distances
+
+
 class DurationDiscriminator(nn.Module):  # vits2
     def __init__(
         self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0
@@ -158,7 +262,8 @@ class StochasticDurationPredictor(nn.Module):
         gin_channels=0,
     ):
         super().__init__()
-        filter_channels = in_channels  # it needs to be removed from future version.
+        # it needs to be removed from future version.
+        filter_channels = in_channels
         self.in_channels = in_channels
         self.filter_channels = filter_channels
         self.kernel_size = kernel_size
@@ -360,10 +465,10 @@ class TextEncoder(nn.Module):
 
     def forward(self, x, x_lengths, tone, language, bert, emo, g=None):
         x_mask = torch.ones_like(x).unsqueeze(0)
-        bert_emb = self.bert_proj(bert.transpose(0, 1).unsqueeze(0)).transpose(1, 2)
+        bert_emb = self.bert_proj(bert.transpose(
+            0, 1).unsqueeze(0)).transpose(1, 2)
         emo_emb = self.in_feature_net(emo.transpose(0, 1))
-        # emo_emb, _, _ = self.emo_vq(emo_emb.unsqueeze(1))
-        emo_emb = emo_emb.unsqueeze(1)
+        emo_emb, _, _ = self.emo_vq(emo_emb.unsqueeze(1))
         emo_emb = self.out_feature_net(emo_emb)
         x = (
             self.emb(x)
@@ -712,12 +817,14 @@ class WavLMDiscriminator(nn.Module):
                     )
                 ),
                 norm_f(
-                    nn.Conv1d(initial_channel * 4, initial_channel * 4, 5, 1, padding=2)
+                    nn.Conv1d(initial_channel * 4,
+                              initial_channel * 4, 5, 1, padding=2)
                 ),
             ]
         )
 
-        self.conv_post = norm_f(Conv1d(initial_channel * 4, 1, 3, 1, padding=1))
+        self.conv_post = norm_f(
+            Conv1d(initial_channel * 4, 1, 3, 1, padding=1))
 
     def forward(self, x):
         x = self.pre(x)
@@ -849,7 +956,8 @@ class SynthesizerTrn(nn.Module):
         )
         self.use_sdp = use_sdp
         self.use_noise_scaled_mas = kwargs.get("use_noise_scaled_mas", False)
-        self.mas_noise_scale_initial = kwargs.get("mas_noise_scale_initial", 0.01)
+        self.mas_noise_scale_initial = kwargs.get(
+            "mas_noise_scale_initial", 0.01)
         self.noise_scale_delta = kwargs.get("noise_scale_delta", 2e-6)
         self.current_mas_noise_scale = self.mas_noise_scale_initial
         if self.use_spk_conditioned_encoder and gin_channels > 0:
@@ -1014,10 +1122,12 @@ class SynthesizerTrn(nn.Module):
             opset_version=17
         )
 
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, tone, language, bert, emo, g)
+        x, m_p, logs_p, x_mask = self.enc_p(
+            x, x_lengths, tone, language, bert, emo, g)
 
         zinput = (
-            torch.randn(x.size(0), 2, x.size(2)).to(device=x.device, dtype=x.dtype)
+            torch.randn(x.size(0), 2, x.size(2)).to(
+                device=x.device, dtype=x.dtype)
             * noise_scale_w
         )
         torch.onnx.export(
@@ -1026,7 +1136,8 @@ class SynthesizerTrn(nn.Module):
             f"onnx/{path}/{path}_sdp.onnx",
             input_names=["x", "x_mask", "zin", "g"],
             output_names=["logw"],
-            dynamic_axes={"x": [0, 2], "x_mask": [0, 2], "zin": [0, 2], "logw": [0, 2]},
+            dynamic_axes={"x": [0, 2], "x_mask": [
+                0, 2], "zin": [0, 2], "logw": [0, 2]},
             verbose=True,
             opset_version=17
         )

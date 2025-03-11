@@ -1,4 +1,5 @@
-﻿from utils import get_hparams_from_file, load_checkpoint
+﻿from onnx_modules.V240_JP.models_onnx import ONNXFriendlyVQ
+from utils import get_hparams_from_file, load_checkpoint
 import json
 
 
@@ -41,6 +42,26 @@ def export_onnx(export_path, model_path, config_path, novq, dev, Extra):
     _ = net_g.eval()
     _ = load_checkpoint(model_path, net_g, None, skip_optimizer=True)
     net_g.cpu()
+
+    # 保存原始模型权重
+    original_vq_codebook = net_g.enc_p.emo_vq.codebook
+
+    # 创建ONNX友好的VQ
+    onnx_vq = ONNXFriendlyVQ(
+        dim=512,
+        codebook_size=256,
+        codebook_dim=16,
+        heads=32,
+        separate_codebook_per_head=True
+    )
+
+    # 将codebook权重转移到新模型
+    # 注意：这只转移codebook，其他EMA相关状态将被丢弃，但对推理没有影响
+    onnx_vq.codebook = original_vq_codebook
+
+    # 替换原始VQ
+    net_g.enc_p.emo_vq = onnx_vq
+
     net_g.export_onnx(export_path)
 
     spklist = []
