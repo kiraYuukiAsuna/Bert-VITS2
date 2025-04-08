@@ -918,7 +918,7 @@ class SynthesizerTrn(nn.Module):
                 "x_mask": [0, 2],
             },
             verbose=True,
-            opset_version=16,
+            opset_version=17,
         )
         x, m_p, logs_p, x_mask = self.enc_p(
             x, x_lengths, tone, language, bert, ja_bert, en_bert, g=g
