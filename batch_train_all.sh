@@ -3,11 +3,10 @@
 # Bert-VITS2 批量训练脚本
 # 自动处理dataset目录下所有包含config.json的角色文件夹
 # 按顺序执行：重采样 -> 文本预处理 -> Bert特征生成 -> 训练
-# 
-# 用法: ./batch_train_all.sh
-# 
-# 作者: GitHub Copilot
-# 日期: $(date +%Y-%m-%d)
+
+# 初始化 conda 并激活环境
+eval "$(conda shell.bash hook)"
+conda activate bv2.3
 
 # 设置颜色输出
 RED='\033[0;31m'
@@ -20,6 +19,7 @@ NC='\033[0m' # No Color
 
 CUDA_VISIBLE_DEVICES=0
 confirm_before_run=true
+copy_base_model=true
 
 # 脚本路径 - 确保在项目根目录执行
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -139,6 +139,21 @@ process_character() {
     echo -e "${CYAN}开始处理角色: $character_name${NC}"
     echo -e "${CYAN}========================================${NC}"
     
+    # 如果启用，复制基础模型
+    if [ "$copy_base_model" = true ]; then
+        # copy base model if exists to the character folder names models directory
+        local base_model_dir="$PROJECT_ROOT/base_model"
+        local target_model_dir="$DATASET_DIR/$character_name/models"
+        if [ -d "$base_model_dir" ]; then
+            echo -e "${BLUE}[INFO]${NC} 复制基础模型到角色目录: $target_model_dir"
+            mkdir -p "$target_model_dir"
+            cp -r "$base_model_dir/"* "$target_model_dir/"
+            echo -e "${GREEN}[OK]${NC} 基础模型复制完成"
+        else
+            echo -e "${YELLOW}[WARN]${NC} 基础模型目录不存在，跳过复制: $base_model_dir"
+        fi
+    fi
+
     # 按顺序执行所有脚本
     for i in "${!SCRIPTS[@]}"; do
         local script="${SCRIPTS[$i]}"

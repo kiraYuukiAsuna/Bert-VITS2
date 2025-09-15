@@ -23,6 +23,12 @@ python resample.py --sr 44100 --in_dir dataset/$DATASET_NAME/AudioRaw --out_dir 
 
 echo "重采样完成: dataset/$DATASET_NAME/wavs"
 echo "覆盖原始音频文件"
+# 如果AudioRaw_Bak存在，先删除
+if [ -d dataset/$DATASET_NAME/AudioRaw_Bak ]; then
+    rm -rf dataset/$DATASET_NAME/AudioRaw_Bak
+    echo "已删除旧的备份目录 AudioRaw_Bak"
+fi
+# 备份并覆盖
 mv dataset/$DATASET_NAME/AudioRaw dataset/$DATASET_NAME/AudioRaw_Bak
 mv dataset/$DATASET_NAME/wavs dataset/$DATASET_NAME/AudioRaw
 echo "原始音频文件已覆盖"
