@@ -32,3 +32,6 @@ pykakasi
 langid
 WeTextProcessing>=0.1.10; platform_system != "Windows"
 standard-imghdr
+soundfile
+torch; platform_system != "Windows"
+torchaudio; platform_system != "Windows"
