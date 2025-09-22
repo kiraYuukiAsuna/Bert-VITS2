@@ -1,1 +1,0 @@
-.\venv\Scripts\python.exe bert_gen.py --config dataset/xiaogong/config.json

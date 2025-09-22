@@ -33,3 +33,6 @@ pykakasi
 langid
 onnxruntime-gpu
 standard-imghdr
+soundfile
+torch; platform_system != "Windows"
+torchaudio; platform_system != "Windows"
