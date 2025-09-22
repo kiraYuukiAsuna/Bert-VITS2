@@ -1,5 +1,5 @@
 import os
-import argparse 
+import argparse
 from multiprocessing import Pool, cpu_count
 
 import soundfile
@@ -8,21 +8,30 @@ from tqdm import tqdm
 
 from config import config
 
-
 def process(item):
-    spkdir, wav_name, args = item
-    wav_path = os.path.join(args.in_dir, spkdir, wav_name)
+    wav_name, args = item
+    wav_path = os.path.join(args.in_dir, wav_name)
     if os.path.exists(wav_path) and wav_path.lower().endswith(".wav"):
-        waveform, sample_rate = torchaudio.load(wav_path)
+        try:
+            waveform, sample_rate = torchaudio.load(wav_path)
 
-        if sample_rate != args.sr:
-            wav = torchaudio.functional.resample(waveform, sample_rate, args.sr)
-            sr = args.sr
-        else:
-            wav = waveform
-            sr = sample_rate
-        wav = wav.squeeze(0)  # 如果需要单声道数据
-        soundfile.write(os.path.join(args.out_dir, spkdir, wav_name), wav, sr)
+            if sample_rate != args.sr:
+                wav = torchaudio.functional.resample(
+                    waveform, sample_rate, args.sr)
+                sr = args.sr
+            else:
+                wav = waveform
+                sr = sample_rate
+            wav = wav.squeeze(0)  # 如果需要单声道数据
+
+            soundfile.write(os.path.join(
+                args.out_dir, wav_name), wav, sr)
+            return "success", wav_name
+        except Exception as e:
+            print(f"Error processing {wav_path}: {e}")
+            if os.path.exists(os.path.join(args.out_dir, wav_name)):
+                os.remove(os.path.join(args.out_dir, wav_name))
+            return "fail", wav_name
 
 
 if __name__ == "__main__":
@@ -62,22 +71,34 @@ if __name__ == "__main__":
     tasks = []
 
     for dirpath, _, filenames in os.walk(args.in_dir):
-        # 子级目录
-        spk_dir = os.path.relpath(dirpath, args.in_dir)
-        spk_dir_out = os.path.join(args.out_dir, spk_dir)
-        if not os.path.isdir(spk_dir_out):
-            os.makedirs(spk_dir_out, exist_ok=True)
+        if not os.path.isdir(args.out_dir):
+            os.makedirs(args.out_dir, exist_ok=True)
         for filename in filenames:
             if filename.lower().endswith(".wav"):
-                twople = (spk_dir, filename, args)
+                twople = (filename, args)
                 tasks.append(twople)
 
-    for _ in tqdm(
+    successCount = 0
+    failCount = 0
+    failed_files = []
+    for result in tqdm(
         pool.imap_unordered(process, tasks),
     ):
-        pass
+        status, wav_name = result
+        if status == "success":
+            successCount += 1
+        else:
+            failCount += 1
+            failed_files.append(wav_name)
+
 
     pool.close()
     pool.join()
 
     print("音频重采样完毕!")
+    print(f"成功处理音频数: {successCount}")
+    print(f"处理失败音频数: {failCount}")
+    if failCount > 0:
+        print("处理失败的音频文件:")
+        for f in failed_files:
+            print(f)

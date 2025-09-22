@@ -35,3 +35,6 @@ onnxruntime-gpu
 opencc
 WeTextProcessing>=1.0.2; platform_system != "Windows"
 standard-imghdr
+soundfile
+torch; platform_system != "Windows"
+torchaudio; platform_system != "Windows"

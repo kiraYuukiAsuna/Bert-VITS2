@@ -187,3 +187,4 @@ Data/*
 /onnx
 /.vs
 .idea/
+base_model/

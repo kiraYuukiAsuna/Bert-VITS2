@@ -1,1 +1,0 @@
-.\venv\Scripts\python.exe clap_gen.py --config dataset/Elysia/config.json
