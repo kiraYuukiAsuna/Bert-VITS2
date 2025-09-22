@@ -16,7 +16,7 @@ DATASET_NAME=$1
 
 # 初始化 conda 并激活环境
 eval "$(conda shell.bash hook)"
-conda activate bv2.4_zh
+conda activate bv2.4_jp
 
 # 运行文本预处理
 python preprocess_text.py --transcription-path dataset/$DATASET_NAME/filelists/Label.list --train-path dataset/$DATASET_NAME/filelists/train.list --val-path dataset/$DATASET_NAME/filelists/val.list --config-path dataset/$DATASET_NAME/config.json

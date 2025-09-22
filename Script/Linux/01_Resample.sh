@@ -16,7 +16,7 @@ DATASET_NAME=$1
 
 # 初始化 conda 并激活环境
 eval "$(conda shell.bash hook)"
-conda activate bv2.4_zh
+conda activate bv2.4_jp
 
 # 运行重采样
 python resample.py --sr 44100 --in_dir dataset/$DATASET_NAME/AudioRaw --out_dir dataset/$DATASET_NAME/wavs

@@ -13,5 +13,5 @@ if "%1"=="" (
 
 set DATASET_NAME=%1
 
-call conda activate bv2.4_zh
+call conda activate bv2.4_jp
 python preprocess_text.py --transcription-path dataset/%DATASET_NAME%/filelists/Label.list --train-path dataset/%DATASET_NAME%/filelists/train.list --val-path dataset/%DATASET_NAME%/filelists/val.list --config-path dataset/%DATASET_NAME%/config.json

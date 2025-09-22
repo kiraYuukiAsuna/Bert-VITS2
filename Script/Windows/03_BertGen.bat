@@ -13,5 +13,5 @@ if "%1"=="" (
 
 set DATASET_NAME=%1
 
-call conda activate bv2.4_zh
+call conda activate bv2.4_jp
 python bert_gen.py --config dataset/%DATASET_NAME%/config.json

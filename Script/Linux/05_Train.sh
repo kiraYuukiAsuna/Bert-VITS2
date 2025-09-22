@@ -16,7 +16,7 @@ DATASET_NAME=$1
 
 # 初始化 conda 并激活环境
 eval "$(conda shell.bash hook)"
-conda activate bv2.4_zh
+conda activate bv2.4_jp
 
 # 运行训练
 python train_ms.py --config dataset/$DATASET_NAME/config.json --model dataset/$DATASET_NAME

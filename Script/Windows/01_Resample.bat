@@ -13,7 +13,7 @@ if "%1"=="" (
 
 set DATASET_NAME=%1
 
-call conda activate bv2.4_zh
+call conda activate bv2.4_jp
 python resample.py --sr 44100 --in_dir dataset/%DATASET_NAME%/AudioRaw --out_dir dataset/%DATASET_NAME%/wavs
 
 echo "重采样完成: dataset/%DATASET_NAME%/wavs"

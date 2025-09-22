@@ -6,7 +6,7 @@
 
 # 初始化 conda 并激活环境
 eval "$(conda shell.bash hook)"
-conda activate bv2.4_zh
+conda activate bv2.4_jp
 
 # 设置颜色输出
 RED='\033[0;31m'
